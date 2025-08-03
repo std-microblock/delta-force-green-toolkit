@@ -1,0 +1,52 @@
+name: Build
+permissions: write-all
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+  release:
+    types: [created]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest]
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - uses: xmake-io/github-action-setup-xmake@v1
+      with:
+        xmake-version: latest
+        actions-cache-folder: '.xmake-cache'
+        actions-cache-key: "ci-${{ matrix.os }}"
+        package-cache: true
+        package-cache-key: "${{ matrix.os }}"
+
+    - name: Xmake configure
+      run: |
+        xmake config --verbose --yes --mode=releasedbg --plat=windows
+
+    - name: Build project
+      run: |
+        xmake --verbose
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        path: build/windows/x64/releasedbg/
+        name: ${{ runner.os }}-build
+
+    - name: Upload Release Assets
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          build/windows/x64/releasedbg/
+        token: ${{ secrets.GITHUB_TOKEN }}
