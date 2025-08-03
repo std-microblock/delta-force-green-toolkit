@@ -71,7 +71,7 @@ void App::move_to_abs(int x, int y) {
   // scale back
   x = static_cast<int>(x / scale) + rect.left;
   y = static_cast<int>(y / scale) + rect.top;
-  input_simulator.move_to(x, y, 100);
+  input_simulator.move_to(x, y, 50);
 }
 std::optional<cv::Rect> App::locate_image_rect(std::string path,
                                                float threshold) {

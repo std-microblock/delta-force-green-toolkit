@@ -142,9 +142,8 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
       }
 
       app.move_to_abs(reach_grid(x, y));
-      app.sleep(200);
-      app.input_simulator.left_click();
-      app.sleep(100);
+      app.sleep(30);
+
       auto img_highlight = app.capture_dfwin();
       // check the slots of the item
       cv::Mat diff;
@@ -170,8 +169,6 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
       if (slots_thisitem.empty()) {
         continue;
       }
-
-      EscapePresser escape_presser(app);
 
       int left = 1000, right = -1, top = 1000, bottom = -1;
       for (const auto &slot : slots_thisitem) {
@@ -227,7 +224,10 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
         continue;
       }
 
-      app.sleep(60);
+      app.input_simulator.left_click();
+      app.sleep(100);
+
+      EscapePresser escape_presser(app);
       auto btn_sell = app.wait_for_image("warehouse/btn_sell.png");
       if (btn_sell) {
         app.move_to_abs(btn_sell.value());
@@ -342,6 +342,8 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
         app.wait_for_image("warehouse/btn_batch_sell_confirm.png").value());
     app.input_simulator.left_click();
     app.sleep(200);
+
+    app.input_simulator.key_tap(VK_ESCAPE);
   } else if (items_to_sell_system.size() == 1) {
     auto item = items_to_sell_system[0];
     app.move_to_abs(reach_grid(item.x, item.y));
@@ -360,6 +362,8 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
         app.move_to_abs(btn_sell_system.value());
         app.input_simulator.left_click();
         app.sleep(100);
+
+        app.input_simulator.key_tap(VK_ESCAPE);
       }
     }
   }
