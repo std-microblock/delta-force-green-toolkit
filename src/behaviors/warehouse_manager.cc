@@ -7,7 +7,7 @@ WarehouseManager::GridDetectionResult
 WarehouseManager::detect_warehouse_grid() {
   using RelPos = App::RelPos;
   auto left_top =
-      app.locate_image("warehouse/warehouse_lefttop.png", RelPos::BottomRight);
+      app.locate_image("warehouse/warehouse_lefttop.png", RelPos::TopRight);
   auto right_top =
       app.locate_image("warehouse/warehouse_righttop.png", RelPos::BottomLeft);
 
@@ -77,8 +77,8 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
   app.sleep(300);
   grid_info = detect_warehouse_grid();
 
-  // cv::imshow("Warehouse Grid", grid_info.visualize(app.capture_dfwin()));
-  // cv::waitKey(0);
+  cv::imshow("Warehouse Grid", grid_info.visualize(app.capture_dfwin()));
+  cv::waitKey(0);
 
   int current_y_grid = 1;
   // move the y-th grid to the top
@@ -202,7 +202,7 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
 
       uint8_t quality = 0;
       int mindiff = 0xffff;
-      auto color = item_img.at<cv::Vec4b>(2, item_img.cols - 5);
+      auto color = item_img.at<cv::Vec4b>(item_img.rows - 8, item_img.cols - 8);
       int r1 = color[2];
       int g1 = color[1];
       int b1 = color[0];
@@ -363,6 +363,8 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
       }
     }
   }
+
+  app.sleep(1000);
 
   // sell items to market one by one
   for (const auto &item : items_to_sell_in_market) {

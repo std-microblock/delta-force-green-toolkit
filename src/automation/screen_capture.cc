@@ -111,7 +111,7 @@ cv::Mat capture_internal(
   session.StartCapture();
 
   winrt::Windows::Graphics::Capture::Direct3D11CaptureFrame frame = nullptr;
-  for (int i = 0; i < 10; ++i) {
+  for (int i = 0; i < 100; ++i) {
     frame = frame_pool.TryGetNextFrame();
     if (frame) {
       break;
