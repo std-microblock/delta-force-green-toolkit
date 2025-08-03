@@ -56,6 +56,7 @@ struct EscapePresser {
 
 static constexpr int max_sell_quality = 4;
 static constexpr int min_delta_price_to_sell_on_market = 6000;
+static constexpr int max_down_price = 7;
 
 std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
   app.focus_df();
@@ -77,8 +78,8 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
   app.sleep(300);
   grid_info = detect_warehouse_grid();
 
-  cv::imshow("Warehouse Grid", grid_info.visualize(app.capture_dfwin()));
-  cv::waitKey(0);
+  // cv::imshow("Warehouse Grid", grid_info.visualize(app.capture_dfwin()));
+  // cv::waitKey(0);
 
   int current_y_grid = 1;
   // move the y-th grid to the top
@@ -300,7 +301,7 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
         }
       }
 
-      app.sleep(800);
+      app.sleep(100);
     }
 
     scroll_to_y(y);
@@ -341,7 +342,7 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
     app.move_to_abs(
         app.wait_for_image("warehouse/btn_batch_sell_confirm.png").value());
     app.input_simulator.left_click();
-    app.sleep(200);
+    app.sleep(500);
 
     app.input_simulator.key_tap(VK_ESCAPE);
   } else if (items_to_sell_system.size() == 1) {
@@ -360,15 +361,13 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
           app.wait_for_image("warehouse/sell_ui/btn_sell_system.png");
       if (btn_sell_system) {
         app.move_to_abs(btn_sell_system.value());
+        app.sleep(500);
         app.input_simulator.left_click();
-        app.sleep(100);
-
-        app.input_simulator.key_tap(VK_ESCAPE);
       }
     }
   }
 
-  app.sleep(1000);
+  app.sleep(500);
 
   // sell items to market one by one
   for (const auto &item : items_to_sell_in_market) {
@@ -397,9 +396,25 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
         if (btn_minus) {
           app.move_to_abs(btn_minus.value());
           app.sleep(100);
-          for (int i = 0; i < 4; ++i) {
+          auto start = app.capture_dfwin();
+          int iDownPrice = 0;
+          while (true) {
+            if (iDownPrice++ > max_down_price) {
+              break;
+            }
             app.input_simulator.left_click();
             app.sleep(50);
+            auto end = app.capture_dfwin();
+            cv::Mat diff;
+            cv::absdiff(start, end, diff);
+            cv::cvtColor(diff, diff, cv::COLOR_BGR2GRAY);
+            cv::threshold(diff, diff, 5, 30, cv::THRESH_BINARY);
+            // only compare the lower 65%
+            if (cv::countNonZero(
+                    diff(cv::Rect(0, diff.rows * 0.35, diff.cols * 0.57,
+                                  diff.rows * 0.65 - 1))) > 600) {
+              break;
+            }
           }
 
           auto btn_upshelf =
@@ -408,7 +423,7 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
           if (btn_upshelf) {
             app.move_to_abs(btn_upshelf.value());
             app.input_simulator.left_click();
-            app.sleep(100);
+            app.sleep(300);
             continue;
           }
         }
@@ -416,8 +431,9 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
     }
 
     std::println("[warehouse] failed to sell item: {}", item);
-    app.input_simulator.key_tap(VK_ESCAPE);
-    app.sleep(100);
+    app.move_to_abs(10, 10);
+    app.input_simulator.left_click();
+    app.sleep(300);
   }
 
   return items;

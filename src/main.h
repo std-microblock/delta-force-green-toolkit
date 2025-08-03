@@ -25,8 +25,8 @@ struct App {
   // is, the smaller the scale is. This is used to scale mouse coordinates and
   // image matching.
   float scale = 1;
-  static constexpr int develop_df_width = 1920;
-  static constexpr int develop_df_height = 1080;
+  static constexpr int develop_df_width = 1936;
+  static constexpr int develop_df_height = 1119;
 
   WarehouseManager warehouse_manager{*this};
 
