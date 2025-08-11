@@ -33,8 +33,8 @@ void App::init() {
   }
 
   RECT rect;
-  if (!GetWindowRect(df_window, &rect)) {
-    throw std::runtime_error("Failed to get Delta Force window rect");
+  if (!GetClientRect(df_window, &rect)) {
+    throw std::runtime_error("Failed to get Delta Force client rect");
   }
 
   int width = rect.right - rect.left;
@@ -46,8 +46,8 @@ void App::init() {
   // unreal engine uses shorter side to calculate scale
   scale = std::min(develop_df_width, develop_df_height) /
           (float)std::min(width, height);
-  std::println("[app] Delta Force Window size: {}x{}, scale: {:.2f}",
-               width, height, scale);
+  std::println("[app] Delta Force Window size: {}x{}, scale: {:.2f}", width,
+               height, scale);
 }
 
 App::App() {}
@@ -169,6 +169,17 @@ std::optional<cv::Point> App::wait_for_image(std::string path,
   }
   return rect_to_relpos(*rect, result_pos);
 }
+void App::focus_maximize_df() {
+  df_window = FindWindowW(L"UnrealWindow", nullptr);
+  if (!df_window) {
+    throw std::runtime_error("Delta Force window not found");
+  }
+  // maximize the window
+  ShowWindow(df_window, SW_MAXIMIZE);
+  // focus the window
+  SetForegroundWindow(df_window);
+  SetFocus(df_window);
+}
 } // namespace dfg
 
 int onOpenCVError(int status, const char *func_name, const char *err_msg,
@@ -188,6 +199,7 @@ int main(int argc, char *argv[]) {
 
   dfg::App app;
   CPPTRACE_TRY {
+    app.focus_maximize_df();
     app.init();
     auto mat = app.capture_dfwin();
     std::println("items: {}", app.warehouse_manager.get_items());

@@ -58,9 +58,15 @@ static constexpr int max_sell_quality = 4;
 static constexpr int min_delta_price_to_sell_on_market = 6000;
 static constexpr int max_down_price = 7;
 
+int color_similarity_lab(const cv::Vec3b &a, const cv::Vec3b &b) {
+  cv::Mat lab_a, lab_b;
+  cv::cvtColor(cv::Mat(1, 1, CV_8UC3, a), lab_a, cv::COLOR_BGR2Lab);
+  cv::cvtColor(cv::Mat(1, 1, CV_8UC3, b), lab_b, cv::COLOR_BGR2Lab);
+  return cv::norm(lab_a, lab_b, cv::NORM_L2);
+}
+
 std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
   app.focus_df();
-  std::mutex mtx_items;
   std::vector<ItemInfo> items;
   auto grid_info = detect_warehouse_grid();
   std::vector<std::vector<bool>> grid(100, std::vector<bool>(9, false));
@@ -92,9 +98,9 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
     app.move_to_abs(pointInGrid);
     for (int i = 0; i < std::abs(delta); ++i) {
       app.input_simulator.wheel_scroll(delta < 0 ? WHEEL_DELTA : -WHEEL_DELTA);
-      app.sleep(15);
+      app.sleep(90);
     }
-    app.sleep(70);
+    app.sleep(90);
     current_y_grid = y;
   };
 
@@ -118,7 +124,10 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
     return grid_center(x, y);
   };
 
-  for (int y = 0; y < 21; y++) {
+  for (int y = 0; y < 25; y++) {
+    scroll_to_y(y < 2 ? y : y - 1);
+    app.sleep(100);
+
     app.move_to_abs(pointOutOfGrid);
     app.sleep(60);
     auto img_no_highlight = app.capture_dfwin();
@@ -191,8 +200,12 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
           (right - left + 1) * grid_info.cell_width,
           (bottom - top + 1) * grid_info.cell_height};
 
-      auto item_img = img_no_highlight(item_rect);
+      std::println("[warehouse] item pos {},{} grid: {}x{}", left, top,
+                   right - left + 1, bottom - top + 1);
 
+      auto item_img = img_no_highlight(item_rect);
+      // cv::imshow("item", item_img);
+      // cv::waitKey(0);
       // determine quality by color
       static std::vector<std::pair<uint64_t, uint8_t>> color_quality_map = {
           {0x1a1f22, 1}, {0x1a2824, 2}, {0x22313d, 3},
@@ -200,20 +213,25 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
 
       uint8_t quality = 0;
       int mindiff = 0xffff;
-      auto color = item_img.at<cv::Vec4b>(item_img.rows - 8, item_img.cols - 8);
+      auto color = item_img.at<cv::Vec4b>(item_img.rows / 2, item_img.cols - 3);
       int r1 = color[2];
       int g1 = color[1];
       int b1 = color[0];
 
-      // std::println("[warehouse] item color: #{:02x}{:02x}{:02x}", r1, g1,
-      // b1);
+      // item_img.at<cv::Vec4b>(3, item_img.cols - 3) = cv::Vec4b{0, 0, 255, 255};
+      // cv::imshow("item color", item_img);
+      // cv::waitKey(0);
+
+      std::println("[warehouse] item color: #{:02x}{:02x}{:02x}", r1, g1, b1);
 
       for (const auto &pair : color_quality_map) {
         int r2 = (pair.first >> 16) & 0xFF;
         int g2 = (pair.first >> 8) & 0xFF;
         int b2 = pair.first & 0xFF;
 
-        int diff = std::abs(r1 - r2) + std::abs(g1 - g2) + std::abs(b1 - b2);
+        int diff = color_similarity_lab(
+            cv::Vec3b{(uint8_t)b1, (uint8_t)g1, (uint8_t)r1},
+            cv::Vec3b{(uint8_t)b2, (uint8_t)g2, (uint8_t)r2});
 
         if (diff < mindiff) {
           quality = pair.second;
@@ -303,9 +321,6 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
 
       app.sleep(100);
     }
-
-    scroll_to_y(y);
-    app.sleep(100);
   }
 
   std::vector<ItemInfo> items_to_sell_in_market;
@@ -330,20 +345,25 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
 
     for (const auto &item : items_to_sell_system) {
       app.move_to_abs(reach_grid(item.x, item.y));
-      app.input_simulator.left_click();
       app.sleep(50);
+      app.input_simulator.left_click();
+      app.sleep(80);
     }
     app.sleep(300);
     app.move_to_abs(
         app.wait_for_image("warehouse/btn_batch_sell_sell.png").value());
     app.input_simulator.left_click();
     app.sleep(500);
+    // app.move_to_abs(
+    //     app.wait_for_image("warehouse/btn_batch_sell_confirm.png").value());
+    // app.input_simulator.left_click();
+    // app.sleep(500);
+    while (app.locate_image("warehouse/btn_batch_sell_confirm.png",
+                            App::RelPos::Center, 0.8f)) {
+      app.sleep(100);
+    }
 
-    app.move_to_abs(
-        app.wait_for_image("warehouse/btn_batch_sell_confirm.png").value());
-    app.input_simulator.left_click();
-    app.sleep(500);
-
+    app.sleep(400);
     app.input_simulator.key_tap(VK_ESCAPE);
   } else if (items_to_sell_system.size() == 1) {
     auto item = items_to_sell_system[0];

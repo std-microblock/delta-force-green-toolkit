@@ -25,8 +25,8 @@ struct App {
   // is, the smaller the scale is. This is used to scale mouse coordinates and
   // image matching.
   float scale = 1;
-  static constexpr int develop_df_width = 1936;
-  static constexpr int develop_df_height = 1119;
+  static constexpr int develop_df_width = 1920;
+  static constexpr int develop_df_height = 1080;
 
   WarehouseManager warehouse_manager{*this};
 
@@ -42,6 +42,7 @@ struct App {
   inline void move_to_abs(cv::Point p) { move_to_abs(p.x, p.y); }
 
   void sleep(int ms, float randomize_rate = 0.2);
+  void focus_maximize_df();
 
   enum class RelPos {
     TopLeft,
