@@ -46,6 +46,8 @@ void App::init() {
   // unreal engine uses shorter side to calculate scale
   scale = std::min(develop_df_width, develop_df_height) /
           (float)std::min(width, height);
+  actual_df_width = width;
+  actual_df_height = height;
   std::println("[app] Delta Force Window size: {}x{}, scale: {:.2f}", width,
                height, scale);
 }

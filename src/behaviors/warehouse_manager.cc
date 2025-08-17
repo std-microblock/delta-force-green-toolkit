@@ -87,9 +87,88 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
   // cv::imshow("Warehouse Grid", grid_info.visualize(app.capture_dfwin()));
   // cv::waitKey(0);
 
-  int current_y_grid = 1;
+  int current_y_grid = 1, warehouse_size = 0;
+  bool in_batch_sell_mode = false;
+  auto recognize_current_scrollbar = [&]() {
+    auto cap = app.capture_dfwin();
+    constexpr int scrollarea_height_normal = 848;
+    constexpr int scrollarea_height_batchsellmode = 803;
+    int scrollarea_height = in_batch_sell_mode ? scrollarea_height_batchsellmode
+                                               : scrollarea_height_normal;
+
+    auto analyze_scrollbar = [&](const cv::Mat &img) {
+      auto scrollbar_area =
+          img(cv::Rect{grid_info.start_x + 9 * grid_info.cell_width, 130, 25,
+                       scrollarea_height});
+      auto gray_scrollbar_area = cv::Mat();
+      cv::cvtColor(scrollbar_area, gray_scrollbar_area, cv::COLOR_BGR2GRAY);
+      auto gray_binary_max_scrollbar_area = cv::Mat();
+      cv::threshold(gray_scrollbar_area, gray_binary_max_scrollbar_area, 95,
+                    130, cv::THRESH_BINARY);
+
+      // extract the scrollbar position and height
+      int scrollbar_height = 0;
+      int scrollbar_y = 0;
+      for (int y = 0; y < gray_binary_max_scrollbar_area.rows; y++) {
+        if (cv::countNonZero(gray_binary_max_scrollbar_area.row(y)) > 2) {
+          scrollbar_height++;
+          if (scrollbar_y == 0)
+            scrollbar_y = y;
+
+        } else if (scrollbar_height > 0) {
+          break;
+        }
+      }
+
+      return std::make_tuple(scrollbar_y, scrollbar_height);
+    };
+
+    static std::optional<float> sb_scale_normal, sb_scale_batchsellmode;
+    auto analyze_scroll_scale = [&]() {
+      auto cap1 = app.capture_dfwin();
+      auto [y1, h1] = analyze_scrollbar(cap1);
+      app.move_to_abs(pointInGrid);
+      for (int i = 0; i < 5; ++i) {
+        app.input_simulator.wheel_scroll(y1 < 100 ? -WHEEL_DELTA : WHEEL_DELTA);
+        app.sleep(100);
+      }
+      auto cap2 = app.capture_dfwin();
+      auto [y2, h2] = analyze_scrollbar(cap2);
+      for (int i = 0; i < 5; ++i) {
+        app.input_simulator.wheel_scroll(y1 > 100 ? -WHEEL_DELTA : WHEEL_DELTA);
+        app.sleep(100);
+      }
+
+      std::println("[warehouse] anal: {} {} {} {}", y1, h1, y2, h2);
+
+      return std::abs((float)grid_info.cell_height * 5 / (y1 - y2));
+    };
+
+    if (in_batch_sell_mode && !sb_scale_batchsellmode)
+      sb_scale_batchsellmode = analyze_scroll_scale();
+    if (!in_batch_sell_mode && !sb_scale_normal)
+      sb_scale_normal = analyze_scroll_scale();
+
+    float sb_scale = in_batch_sell_mode ? sb_scale_batchsellmode.value()
+                                        : sb_scale_normal.value();
+
+    auto [scrollbar_y, scrollbar_height] = analyze_scrollbar(cap);
+
+    warehouse_size = (scrollarea_height - scrollbar_height) * sb_scale /
+                         grid_info.cell_height +
+                     13 - 1;
+    current_y_grid = scrollbar_y * sb_scale / grid_info.cell_height;
+
+    std::println("[warehouse] recognized current_y_grid: {}, warehouse_size: "
+                 "{} (scrolly {} h {} ht {})",
+                 current_y_grid, warehouse_size, scrollbar_y, scrollbar_height,
+                 scrollarea_height);
+  };
+
   // move the y-th grid to the top
   auto scroll_to_y = [&](int y) {
+    recognize_current_scrollbar();
+  retry:
     if (current_y_grid == y) {
       return;
     }
@@ -100,8 +179,10 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
       app.input_simulator.wheel_scroll(delta < 0 ? WHEEL_DELTA : -WHEEL_DELTA);
       app.sleep(90);
     }
-    app.sleep(90);
-    current_y_grid = y;
+    recognize_current_scrollbar();
+    if (current_y_grid != y) {
+      goto retry;
+    }
   };
 
   auto grid_rect = [&](int x, int y) {
@@ -116,6 +197,7 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
   };
 
   auto reach_grid = [&](int x, int y) {
+    recognize_current_scrollbar();
     constexpr static int max_cell_rows = 10;
     if (y >= current_y_grid + max_cell_rows || y < current_y_grid) {
       scroll_to_y(y);
@@ -123,8 +205,8 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
 
     return grid_center(x, y);
   };
-
-  for (int y = 0; y < 25; y++) {
+  scroll_to_y(0);
+  for (int y = 0; y < warehouse_size - 14; y++) {
     scroll_to_y(y < 2 ? y : y - 1);
     app.sleep(100);
 
@@ -218,9 +300,8 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
       int g1 = color[1];
       int b1 = color[0];
 
-      // item_img.at<cv::Vec4b>(3, item_img.cols - 3) = cv::Vec4b{0, 0, 255, 255};
-      // cv::imshow("item color", item_img);
-      // cv::waitKey(0);
+      // item_img.at<cv::Vec4b>(3, item_img.cols - 3) = cv::Vec4b{0, 0, 255,
+      // 255}; cv::imshow("item color", item_img); cv::waitKey(0);
 
       std::println("[warehouse] item color: #{:02x}{:02x}{:02x}", r1, g1, b1);
 
@@ -339,6 +420,7 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
 
   // batch sell items to be sold to system
   if (items_to_sell_system.size() > 1) {
+    in_batch_sell_mode = true;
     app.move_to_abs(app.wait_for_image("warehouse/btn_batch_sell.png").value());
     app.input_simulator.left_click();
     app.sleep(100);
@@ -365,6 +447,7 @@ std::vector<WarehouseManager::ItemInfo> WarehouseManager::get_items() {
 
     app.sleep(400);
     app.input_simulator.key_tap(VK_ESCAPE);
+    in_batch_sell_mode = false;
   } else if (items_to_sell_system.size() == 1) {
     auto item = items_to_sell_system[0];
     app.move_to_abs(reach_grid(item.x, item.y));

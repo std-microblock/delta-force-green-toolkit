@@ -27,6 +27,8 @@ struct App {
   float scale = 1;
   static constexpr int develop_df_width = 1920;
   static constexpr int develop_df_height = 1080;
+  int actual_df_width = 0;
+  int actual_df_height = 0;
 
   WarehouseManager warehouse_manager{*this};
 
