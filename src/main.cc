@@ -26,6 +26,8 @@ cv::Mat App::capture_dfwin() {
 
 void App::init() {
   ocr.initialize();
+  SetProcessDPIAware();
+  SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
   df_window = FindWindowW(L"UnrealWindow", nullptr);
   if (!df_window) {
@@ -43,13 +45,16 @@ void App::init() {
     throw std::runtime_error("Invalid Delta Force window size");
   }
 
-  // unreal engine uses shorter side to calculate scale
-  scale = std::min(develop_df_width, develop_df_height) /
-          (float)std::min(width, height);
-  actual_df_width = width;
-  actual_df_height = height;
-  std::println("[app] Delta Force Window size: {}x{}, scale: {:.2f}", width,
-               height, scale);
+  actual_df_width = develop_df_width;
+  actual_df_height = develop_df_height;
+
+  scale = 1;
+
+  SetWindowPos(df_window, nullptr, 0, 0, actual_df_width, actual_df_height,
+               SWP_NOZORDER | SWP_NOMOVE | SWP_NOACTIVATE);
+
+  std::println("[app] Delta Force Window size: {}x{}, scale: {:.2f}",
+               actual_df_width, actual_df_height, scale);
 }
 
 App::App() {}
